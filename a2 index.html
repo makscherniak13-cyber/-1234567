@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Кликер с тёмным режимом</title>
+  <style>
+    :root {
+      --bg: #f4f4f4;
+      --text: #333;
+      --btn: #3b82f6;
+    }
+
+    body.dark {
+      --bg: #222;
+      --text: #eee;
+      --btn: #8ab4f8;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: var(--bg);
+      text-align: center;
+      padding-top: 30px;
+      color: var(--text);
+      transition: background 0.5s, color 0.5s;
+    }
+
+    h1 {
+      margin-bottom: 10px;
+    }
+
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      border: none;
+      border-radius: 5px;
+      background: var(--btn);
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    button:disabled {
+      background: #aaa;
+    }
+
+    .stats {
+      margin-top: 20px;
+      font-size: 20px;
+    }
+
+    .progress-container {
+      width: 80%;
+      background: #ddd;
+      margin: 15px auto;
+      height: 20px;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 20px;
+      width: 0;
+      background: var(--btn);
+      transition: width 0.3s;
+    }
+
+    #achievements {
+      margin-top: 20px;
+      font-size: 16px;
+      color: green;
+    }
+  </style>
+</head>
+<body>
+  <h1>Кликер</h1>
+
+  <div class="stats">
+    <p>Монеты: <span id="coins">0</span></p>
+    <p>+1 за клик: <span id="plus">1</span></p>
+    <p>Автоклик: <span id="auto">0</span>/сек</p>
+  </div>
+
+  <button onclick="clickCoin()">Кликнуть</button>
+  <button onclick="buyPlusOne()">Купить +1 (Цена: <span id='plusPrice'>50</span>)</button>
+  <button onclick="buyAutoClick()">Купить автоклик (Цена: <span id='autoPrice'>100000</span>)</button>
+  <br>
+  <button onclick="buyCoins()">Купить 10 монет (Цена: <span id='buyCoinsPrice'>100</span>)</button>
+  <button onclick="buyPack(1000,100)">Купить 100 за 1000</button>
+  <button onclick="buyPack(10000,1000)">Купить 1000 за 10000</button>
+  <button onclick="buyPack(100000,10000)">Купить 10000 за 100000</button>
+  <br><br>
+  <button id="chestButton" onclick="openChest()" disabled>Сундук</button>
+  <br><br>
+  <button onclick="toggleTheme()">Тёмный / Светлый</button>
+
+  <div class="progress-container">
+    <div class="progress-bar" id="progressBar"></div>
+  </div>
+
+  <div id="achievements"></div>
+
+  <script>
+    // === Переменные ===
+    let coins = parseInt(localStorage.getItem('coins')) || 0;
+    let plus = parseInt(localStorage.getItem('plus')) || 1;
+    let plusPrice = parseInt(localStorage.getItem('plusPrice')) || 50;
+    let auto = parseInt(localStorage.getItem('auto')) || 0;
+    let autoPrice = parseInt(localStorage.getItem('autoPrice')) || 100000;
+    let buyCoinsPrice = parseInt(localStorage.getItem('buyCoinsPrice')) || 100;
+
+    const achievementsList = [10, 100, 1000, 10000, 100000, 1000000];
+    let currentAchievementIndex = parseInt(localStorage.getItem('currentAchievementIndex')) || 0;
+
+    // === Тёмная тема ===
+    if (localStorage.getItem('theme') === 'dark') {
+      document.body.classList.add('dark');
+    }
+
+    function toggleTheme() {
+      document.body.classList.toggle('dark');
+      localStorage.setItem('theme', document.body.classList.contains('dark') ? 'dark' : 'light');
+    }
+
+    // === Клик ===
+    function clickCoin() {
+      coins += plus;
+      randomBackground();
+      saveGame();
+      updateUI();
+      updateProgress();
+      checkAchievements();
+    }
+
+    // === Купить +1 ===
+    function buyPlusOne() {
+      if (coins >= plusPrice) {
+        coins -= plusPrice;
+        plus += 1;
+        plusPrice = Math.ceil(plusPrice * 2.5);
+        saveGame();
+        updateUI();
+      }
+    }
+
+    // === Купить автоклик ===
+    function buyAutoClick() {
+      if (coins >= autoPrice) {
+        coins -= autoPrice;
+        auto += 1;
+        autoPrice = Math.ceil(autoPrice * 2.5);
+        saveGame();
+        updateUI();
+      }
+    }
+
+    // === Купить 10 монет ===
+    function buyCoins() {
+      if (coins >= buyCoinsPrice) {
+        coins -= buyCoinsPrice;
+        coins += 10;
+        buyCoinsPrice = Math.ceil(buyCoinsPrice * 2.5);
+        saveGame();
+        updateUI();
+      }
+    }
+
+    // === Купить пакеты монет (новое) ===
+    function buyPack(price, amount) {
+      if (coins >= price) {
+        coins -= price;
+        coins += amount;
+        saveGame();
+        updateUI();
+      }
+    }
+
+    // === Автоклик каждую секунду ===
+    setInterval(() => {
+      if (auto > 0) {
+        coins += auto;
+        saveGame();
+        updateUI();
+        updateProgress();
+        checkAchievements();
+      }
+    }, 1000);
+
+    // === Сундук каждые 30 секунд ===
+    setInterval(() => {
+      document.getElementById('chestButton').disabled = false;
+    }, 30000);
+
+    function openChest() {
+      let reward = Math.floor(Math.random() * 200) + 100;
+      coins += reward;
+      alert(`Ты открыл сундук и получил ${reward} монет!`);
+      document.getElementById('chestButton').disabled = true;
+      saveGame();
+      updateUI();
+      updateProgress();
+      checkAchievements();
+    }
+
+    // === Достижения ===
+    function checkAchievements() {
+      if (currentAchievementIndex < achievementsList.length && coins >= achievementsList[currentAchievementIndex]) {
+        document.getElementById('achievements').textContent =
+          `Поздравляю! Ты достиг ${achievementsList[currentAchievementIndex]} монет!`;
+        currentAchievementIndex++;
+        localStorage.setItem('currentAchievementIndex', currentAchievementIndex);
+      }
+    }
+
+    // === Прогресс-бар ===
+    function updateProgress() {
+      let nextGoal = achievementsList[currentAchievementIndex] || achievementsList[achievementsList.length - 1];
+      let percent = (coins / nextGoal) * 100;
+      if (percent > 100) percent = 100;
+      document.getElementById('progressBar').style.width = percent + '%';
+    }
+
+    // === Случайный фон (градиент) ===
+    function randomBackground() {
+      const colors = [
+        ['#ff9a9e', '#fad0c4'],
+        ['#a18cd1', '#fbc2eb'],
+        ['#f6d365', '#fda085'],
+        ['#84fab0', '#8fd3f4'],
+        ['#fccb90', '#d57eeb']
+      ];
+      const c = colors[Math.floor(Math.random() * colors.length)];
+      document.body.style.background = `linear-gradient(135deg, ${c[0]}, ${c[1]})`;
+    }
+
+    // === Сохранение ===
+    function saveGame() {
+      localStorage.setItem('coins', coins);
+      localStorage.setItem('plus', plus);
+      localStorage.setItem('plusPrice', plusPrice);
+      localStorage.setItem('auto', auto);
+      localStorage.setItem('autoPrice', autoPrice);
+      localStorage.setItem('currentAchievementIndex', currentAchievementIndex);
+      localStorage.setItem('buyCoinsPrice', buyCoinsPrice);
+    }
+
+    // === UI ===
+    function updateUI() {
+      document.getElementById('coins').textContent = coins;
+      document.getElementById('plus').textContent = plus;
+      document.getElementById('plusPrice').textContent = plusPrice;
+      document.getElementById('auto').textContent = auto;
+      document.getElementById('autoPrice').textContent = autoPrice;
+      document.getElementById('buyCoinsPrice').textContent = buyCoinsPrice;
+    }
+
+    // === Старт ===
+    updateUI();
+    updateProgress();
+    checkAchievements();
+  </script>
+</body>
+</html>
